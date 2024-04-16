@@ -1,4 +1,5 @@
 # ANTI GENSHIN IMPACT DISCORD BOT
+A discord bot that automatically flags a user for playing or discussing about Genshin Impact
 
 ## Disclaimer
 This is an extremely old project and one of my first projects, the project is structured very poorly and at the time I did not know about JSON. Furthermore

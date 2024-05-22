@@ -1,0 +1,6 @@
+{
+    "role_name": "Genshin Player",
+    "filter_words": ["genshin", "primogem", "paimon"],
+    "nicknames": ["Genshin Player", "Impact Player"],
+    "responses": ["No genshin players allowed in this server", "Please do not mention genshin"]
+}

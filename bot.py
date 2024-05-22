@@ -1,134 +1,105 @@
-# WARNING: EXTREMELY OLD AND POORLY WRITTEN
-
-#################################################
-#### INSTRUCTIONS ###############################
-#################################################
-
-## SET UP THE SERVER ##
-# 1. Change the role name to whatever your 'mute' role is in your server:
-role_name = 'Genshin players'
-
-## SET UP THE SCRIPT ##
-# 1. Insert your bot token below:
-TOKEN = ''
-# 2. If you want to REMOVE words from the filter, go into filter.txt under the config folder and remove a word.
-# 3. If you want to ADD words from the filter, go into filter.txt under the config folder and add a word seperated by a NEW LINE
-# 4. If you want to ADD to the nicknames, go into nicknames under config and seperate each nickname by a colon (':')
-# 5. Adding responses is the same thing as adding nicknames
-
-#################################################
-#################################################
-#################################################
-
-import discord, random, time
+import discord
+import json
+import random
 from discord.ext import commands
 
-
-
-with open('config/nicknames','r') as f:
-    global nickname
-    words = f.read()
-    nicknames = words.split(':')
-
-with open('config/filter.txt','r') as f:
-    global filter
-    words = f.read()
-    triggerwords = words.split()
-
-with open('config/responses.txt','r') as f:
-    global response
-    resp = f.read()
-    response_list = resp.split(':')
-
-intents = discord.Intents().all()
+intents = discord.Intents.all()
 intents.members = True
+
 client = commands.Bot(command_prefix='$', intents=intents)
-bot = discord.Client(intents=intents)
+config_directory = 'config/config.json'
+TOKEN = ''
+
+# Load configurations from JSON file
+def load_config():
+    with open(config_directory, 'r') as f:
+        return json.load(f)
+
+
+config = load_config()
 
 
 @client.event
 async def on_ready():
-    print('Logged in as: {0.user}'.format(client))
+    print(f'Logged in as: {client.user}')
+
 
 @client.event
 async def on_message(message):
-    recipient = message.author
+
     if message.author == client.user:
         return
-    msg = message.content
-    if any(word in msg.lower() for word in triggerwords):
-        role = discord.utils.get(message.author.guild.roles, name=role_name)
-        # member = discord.utils.get(message.author.guild.roles,name=member_role)
-        if not recipient.guild_permissions.kick_members:
-            await recipient.edit(roles=[role])
-            await recipient.edit(nick=random.choice(nicknames))
-        else:
-            await recipient.add_roles(role)
-        await message.channel.send(random.choice(response_list) + message.author.mention)
-        while recipient is not None and role in recipient.roles:
-            time.sleep(.25)
-            await recipient.send(random.choice(response_list) + message.author.mention)
-        else:
-            await recipient.send(recipient + ' left')
-    if message.content.startswith('$addresponse'):
-        phrase = message.content.split('$addresponse', 1)[1]
-        with open('config/responses.txt', 'r') as f:
-            global filter
-            phrases = f.read()
-            if phrase not in phrases:
-                with open('config/responses.txt', "a") as f:
-                    f.write(phrase + ":")
-                    await message.channel.send(f'{phrase} has been successfully added!')
-            else:
-                await message.channel.send(f'{phrase} is already added!')
+
+    config = load_config()  # Reload configuration on every message
+    msg = message.content.lower()
+
+    if any(word in msg for word in config['filter_words']):
+        role = discord.utils.get(message.guild.roles, name=config['role_name'])
+        if role: #and not message.author.guild_permissions.kick_members:
+            await message.author.edit(roles=[role])  # Set roles to only the mute role
+            await message.author.edit(nick=random.choice(config['nicknames']))
+            await message.channel.send(random.choice(config['responses']) + message.author.mention)
 
     await client.process_commands(message)
 
 
+@client.command()
+@commands.has_permissions(manage_roles=True)
+async def updaterole(ctx, *, new_role_name):
+    config = load_config()
+    config['role_name'] = new_role_name
+    with open(config_directory, 'w') as f:
+        json.dump(config, f)
+    await ctx.send(f"Mute role updated to: {new_role_name}")
+
+
+@client.command()
+@commands.has_permissions(manage_messages=True)
+async def addfilter(ctx, *, word):
+    config = load_config()
+    if word.lower() not in config['filter_words']:
+        config['filter_words'].append(word.lower())
+        with open(config_directory, 'w') as f:
+            json.dump(config, f)
+        await ctx.send(f'Word "{word}" added to filter.')
+    else:
+        await ctx.send('That word is already in the filter.')
+
+
+@client.command()
+@commands.has_permissions(manage_messages=True)
+async def removefilter(ctx, *, word):
+    config = load_config()
+    if word.lower() in config['filter_words']:
+        config['filter_words'].remove(word.lower())
+        with open(config_directory, 'w') as f:
+            json.dump(config, f)
+        await ctx.send(f'Word "{word}" removed from filter.')
+    else:
+        await ctx.send('Word not found in the filter.')
+
+
+@client.command()
+@commands.has_permissions(manage_messages=True)
+async def addresponse(ctx, *, response):
+    config = load_config()
+    if response not in config['responses']:
+        config['responses'].append(response)
+        with open(config_directory, 'w') as f:
+            json.dump(config, f)
+        await ctx.send(f'Response "{response}" added.')
+    else:
+        await ctx.send('That response is already added.')
+
 @client.event
 async def on_presence_update(prev,cur):
-    role = discord.utils.get(cur.guild.roles, name=role_name)
+    role = discord.utils.get(cur.guild.roles, name=config['role_name'])
     game = "genshin impact"
 
     if cur.activity and cur.activity.name.lower() == game:
             await cur.edit(roles=[role]) #removes all roles except for mute role
     elif prev.activity and prev.activity.name.lower() == game and not cur.activity:
             return
-
-
-@client.command(aliases=['filter','f'])
-@commands.has_permissions(kick_members=True)
-async def add_filter(ctx,arg):
-    word = arg
-    with open('config/filter.txt', 'r') as f:
-        global filter
-        words = f.read()
-        if word.lower() not in words:
-            with open('config/filter.txt', "a") as f:
-                f.write(word + "\n")
-                await ctx.send(word + ' successfully filtered')
-        else:
-            await ctx.send('That word is already filtered!')
-
-
-
-@client.command(aliases=['rfilter'])
-async def remove_filter(ctx,arg):
-    word = arg
-    with open('config/filter.txt', 'r') as f:
-        global filter
-        words = f.read()
-        if word.lower() not in words:
-            await ctx.send(f'{word} is not found in the list')
-        else:
-            with open('config/filter.txt', 'w') as f:
-                delete = words.replace(word, '')
-                f.write(delete)
-                await ctx.send(f'{word} successfully removed!')
-
-
-
-
 
 
 client.run(TOKEN)

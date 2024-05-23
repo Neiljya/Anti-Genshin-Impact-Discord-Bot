@@ -35,7 +35,7 @@ async def on_message(message):
 
     if any(word in msg for word in config['filter_words']):
         role = discord.utils.get(message.guild.roles, name=config['role_name'])
-        if role: and not message.author.guild_permissions.kick_members:
+        if role and not message.author.guild_permissions.kick_members:
             await message.author.edit(roles=[role])  # Set roles to only the mute role
             await message.author.edit(nick=random.choice(config['nicknames']))
             await message.channel.send(random.choice(config['responses']) + message.author.mention)
